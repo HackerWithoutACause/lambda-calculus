@@ -13,11 +13,12 @@ simply do:
 ```
 git clone https://github.com/HackerWithoutACause/lambda-calculus
 cd lambda-calculus
-cargo run --release
+cargo run --release -- 'your expression'
 ```
 
 ## Future Work
 
+* Support passing a file as input rather than just though command line arguments.
 * Constant definitions for standard terms and others.
 * Multi-character variables.
 * Support for [typed lambda calculus](https://en.wikipedia.org/wiki/Typed_lambda_calculus).

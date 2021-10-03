@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 mod parser;
 
 use std::fmt;
@@ -43,16 +42,11 @@ impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Identifier(x) => write!(f, "{}", x),
-            Application(x1, x2) => write!(f, "({}{})", x1, x2),
+            Application(x1, x2) => write!(f, "({} {})", x1, x2),
             Abstraction(var, body) => write!(f, "(λ{}.{})", var, body),
         }
     }
 }
-
-// enum Associativity {
-//     Left,
-//     Right
-// }
 
 use Expression::*;
 
@@ -70,54 +64,13 @@ impl ExtendExt<Expression> for Option<Expression> {
     }
 }
 
-/*
-(
-    ((λ x. (λ y. x)) (λ a. a))
-    ((λx. (x x)) (λx. (x x)))
-)
-*/
-
 fn main() {
     let expr = "((λ a. (λ b. (a (a (a b))))) (λ c. (λ d. (c (c d)))))";
 
-    // let mut tree = parser::parse(&mut String::from(expr)).expect("Empty base expression");
     let tree = parser::parse(&mut String::from(expr));
 
     println!("{} -> {}", tree, normalize(tree.clone()));
-    // loop {
-    //     x += 1;
-    //     let norm = normalize(tree.clone());
-    //     println!("{} -> {}", tree, norm);
-    //     tree = norm;
-
-    //     if x > 20 {
-    //         return;
-    //     }
-    // }
 }
-
-// fn normalize(mut expr: Expression) -> Expression {
-//     let mut count = 0;
-
-//     loop {
-//         match expr {
-//             e @ Application(_, _) => {
-//                 expr = e;
-//                 count += 1;
-
-//                 if count >= u16::MAX {
-//                     panic!("Stack Overflow: possible infinite recursion!")
-//                 }
-//             }
-//             e @ _ => return e,
-//         }
-//     }
-// }
-
-/*
-((λx.(λy.x))(λa.a))
-(λy.(λa.a))
-*/
 
 fn normalize(mut expr: Expression) -> Expression {
     let mut count = 0;
@@ -128,8 +81,6 @@ fn normalize(mut expr: Expression) -> Expression {
                 if let Abstraction(y, n) = normalize(*e1.clone()) {
                     expr = substitute(*n, y, &*e2)
                 } else {
-                    // panic!("Tried to apply non lambda!")
-                    // expr = Application(e1, e2)
                     return Application(e1, Box::new(normalize(*e2)));
                 }
             }
@@ -142,7 +93,6 @@ fn normalize(mut expr: Expression) -> Expression {
             panic!("Stack Overflow: possible infinite recursion!")
         }
     }
-    // println!("KICKING: '{}' -> '{}'", expr, out);
 }
 
 fn alpha(expr: Expression, x: Variable, z: Variable) -> Expression {
@@ -172,8 +122,6 @@ fn free(expr: Expression) -> HashSet<Variable> {
 }
 
 fn substitute(expr: Expression, y: Variable, n: &Expression) -> Expression {
-    // println!("{}", expr);
-
     match expr {
         Identifier(x) if x == y => n.clone(),
         x @ Identifier(_) => x,
@@ -181,9 +129,6 @@ fn substitute(expr: Expression, y: Variable, n: &Expression) -> Expression {
             Application(Box::new(substitute(*x1, y, n)), Box::new(substitute(*x2, y, n))),
         Abstraction(ref x, _) if *x == y => expr.clone(),
         Abstraction(x, e) => {
-            // println!("{:?} free in '{}' contains '{:?}' ? {:?}", free(n.clone()), n, x,
-            //          free(n.clone()).contains(&x));
-
             if free(n.clone()).contains(&x) {
                 let nxt = x.next();
                 let e_prime = alpha(*e, x, nxt);
@@ -193,6 +138,4 @@ fn substitute(expr: Expression, y: Variable, n: &Expression) -> Expression {
             }
         }
     }
-
-    // println!("BINDING: '{}' in '{}' with '{}' -> '{}'", y, expr, n, out);
 }
