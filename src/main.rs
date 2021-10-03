@@ -1,4 +1,5 @@
-#![allow(dead_code)]
+mod parser;
+
 use std::fmt;
 use std::collections::HashSet;
 
@@ -64,34 +65,6 @@ impl Expression {
             x => Application(Box::new(x), Box::new(other)),
         }
     }
-}
-
-fn apply(e1: Expression, e2: Expression) -> Expression {
-    Application(Box::new(e1), Box::new(e2))
-}
-
-fn abstract_(v: char, e: Expression) -> Expression {
-    Abstraction(Variable::from(v), Box::new(e))
-}
-
-fn id(v: char) -> Expression {
-    Identifier(Variable::from(v))
-}
-
-/*
-((λa.(λb.(a(a(ab)))))(λx.x))
-*/
-
-/*
-((λa.(λb.(a(a(ab)))))(λx.x))
-(λb.((λx.x)((λx.x)((λx.x)))))
-*/
-
-fn correct() -> Expression {
-    apply(
-        abstract_('a', abstract_('b', apply(id('a'), apply(id('a'), apply(id('a'), id('b')))))),
-        abstract_('c', abstract_('d', apply(id('c'), apply(id('c'), id('d')))))
-    )
 }
 
 fn main() {
