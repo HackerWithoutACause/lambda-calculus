@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 mod parser;
 
 use std::fmt;
@@ -35,7 +36,6 @@ enum Expression {
     Identifier(Variable),
     Application(Box<Expression>, Box<Expression>),
     Abstraction(Variable, Box<Expression>),
-    Blank, // Should be removed by end of parsing
 }
 
 
@@ -45,7 +45,6 @@ impl fmt::Display for Expression {
             Identifier(x) => write!(f, "{}", x),
             Application(x1, x2) => write!(f, "({}{})", x1, x2),
             Abstraction(var, body) => write!(f, "(λ{}.{})", var, body),
-            Blank => write!(f, "!"),
         }
     }
 }
@@ -57,70 +56,91 @@ impl fmt::Display for Expression {
 
 use Expression::*;
 
-impl Expression {
-    pub fn extend(self, other: Expression) -> Self {
-        match self {
-            Blank => other,
-            Application(x1, x2) => Application(Box::new(Application(x1, x2)), Box::new(other)),
-            x => Application(Box::new(x), Box::new(other)),
-        }
+trait ExtendExt<T> {
+    fn extend(&mut self, other: T);
+}
+
+impl ExtendExt<Expression> for Option<Expression> {
+    fn extend(&mut self, other: Expression) {
+        *self = Some(match self.take() {
+            Some(Application(x1, x2)) => Application(Box::new(Application(x1, x2)), Box::new(other)),
+            Some(x) => Application(Box::new(x), Box::new(other)),
+            None => other,
+        })
     }
 }
+
+/*
+(
+    ((λ x. (λ y. x)) (λ a. a))
+    ((λx. (x x)) (λx. (x x)))
+)
+*/
 
 fn main() {
-    let expr = "((λa.(λb.(a(a b))))(λx.λd.d x))";
-    let mut x = 0;
+    let expr = "((λ a. (λ b. (a (a (a b))))) (λ c. (λ d. (c (c d)))))";
 
-    let mut tree = parse(&mut String::from(expr)).expect("Empty base expression");
+    // let mut tree = parser::parse(&mut String::from(expr)).expect("Empty base expression");
+    let tree = parser::parse(&mut String::from(expr));
 
-    // println!("{} -> {}", tree, normalize(tree.clone()));
-    loop {
-        x += 1;
-        let norm = normalize(tree.clone());
-        println!("{} -> {}", tree, norm);
-        tree = norm;
+    println!("{} -> {}", tree, normalize(tree.clone()));
+    // loop {
+    //     x += 1;
+    //     let norm = normalize(tree.clone());
+    //     println!("{} -> {}", tree, norm);
+    //     tree = norm;
 
-        if x > 20 {
-            return;
-        }
-    }
+    //     if x > 20 {
+    //         return;
+    //     }
+    // }
 }
 
-fn normalize(mut expr: Expression) -> Expression {
-    let mut count = 0;
+// fn normalize(mut expr: Expression) -> Expression {
+//     let mut count = 0;
 
-    loop {
-        match kickoff(expr) {
-            e @ Application(_, _) => {
-                expr = e;
-                count += 1;
+//     loop {
+//         match expr {
+//             e @ Application(_, _) => {
+//                 expr = e;
+//                 count += 1;
 
-                if count >= u16::MAX {
-                    panic!("Stack Overflow: possible infinite recursion!")
-                }
-            }
-            e @ _ => return e,
-        }
-    }
-}
+//                 if count >= u16::MAX {
+//                     panic!("Stack Overflow: possible infinite recursion!")
+//                 }
+//             }
+//             e @ _ => return e,
+//         }
+//     }
+// }
 
 /*
 ((λx.(λy.x))(λa.a))
 (λy.(λa.a))
 */
 
-fn kickoff(expr: Expression) -> Expression {
-    match expr {
-        Application(e1, e2) => {
-            if let Abstraction(y, n) = normalize(*e1.clone()) {
-                substitute(*n, y, &*e2)
-            } else {
-                // panic!("Tried to apply non lambda!")
-                Application(e1, e2)
+fn normalize(mut expr: Expression) -> Expression {
+    let mut count = 0;
+
+    loop {
+        match expr {
+            Application(e1, e2) => {
+                if let Abstraction(y, n) = normalize(*e1.clone()) {
+                    expr = substitute(*n, y, &*e2)
+                } else {
+                    // panic!("Tried to apply non lambda!")
+                    // expr = Application(e1, e2)
+                    return Application(e1, Box::new(normalize(*e2)));
+                }
             }
+            Abstraction(x, e) => return Abstraction(x, Box::new(normalize(*e))),
+            x @ _ => return x,
         }
-        Abstraction(x, e) => Abstraction(x, Box::new(kickoff(*e))),
-        x @ _ => x,
+
+        count += 1;
+        if count >= u16::MAX {
+            panic!("Stack Overflow: possible infinite recursion!")
+        }
     }
     // println!("KICKING: '{}' -> '{}'", expr, out);
 }
@@ -133,7 +153,6 @@ fn alpha(expr: Expression, x: Variable, z: Variable) -> Expression {
             Application(Box::new(alpha(*e1, x, z)), Box::new(alpha(*e2, x, z))),
         Abstraction(y, e) if y == x => Abstraction(y, e),
         Abstraction(y, e) => Abstraction(y, Box::new(alpha(*e, x, z))),
-        Blank => panic!("Unexpected in parser output!"),
     }
 }
 
@@ -147,7 +166,6 @@ fn free(expr: Expression) -> HashSet<Variable> {
             map = free(*e);
             map.remove(&x);
         },
-        Blank => panic!("Unexpected in parser output!"),
     }
 
     map
@@ -174,47 +192,7 @@ fn substitute(expr: Expression, y: Variable, n: &Expression) -> Expression {
                 Abstraction(x, Box::new(substitute(*e, y, n)))
             }
         }
-        Blank => panic!("Unexpected in parser output!"),
     }
 
     // println!("BINDING: '{}' in '{}' with '{}' -> '{}'", y, expr, n, out);
-}
-
-fn parse(line: &mut String) -> Option<Expression> {
-    let mut expression = Expression::Blank;
-
-    while line.len() != 0 {
-        match line.remove(0) {
-            '(' => expression = expression.extend(parse(line).expect("Empty grouping")),
-            ')' => break,
-            'λ' | '\\' => {
-                expression = expression.extend(parse_abstraction(line));
-                break;
-            },
-            c if c.is_alphabetic() => expression = expression.extend(Identifier(Variable::from(c))),
-            c if c.is_whitespace() => (),
-            c => panic!("Unknown character: {}", c)
-        }
-    }
-
-    Some(expression)
-}
-
-fn parse_abstraction(expr: &mut String) -> Expression {
-    let mut arguments = Vec::new();
-
-    while expr.len() != 0 {
-        match expr.remove(0) {
-            c if c.is_alphabetic() => arguments.push(c),
-            c if c.is_whitespace() => (),
-            '.' => return
-                Expression::Abstraction(
-                    Variable::from(arguments[0]),
-                    Box::new(parse(expr).expect("Must have function body"))
-                ),
-            c => panic!("Unknown character: {}", c)
-        }
-    }
-
-    unreachable!()
 }
