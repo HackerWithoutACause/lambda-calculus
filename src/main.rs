@@ -65,9 +65,10 @@ impl ExtendExt<Expression> for Option<Expression> {
 }
 
 fn main() {
-    let expr = "((λ a. (λ b. (a (a (a b))))) (λ c. (λ d. (c (c d)))))";
+    let mut expr = std::env::args().nth(1)
+        .expect("Expected first argument of lambda expression to evaluate.");
 
-    let tree = parser::parse(&mut String::from(expr));
+    let tree = parser::parse(&mut expr);
 
     println!("{} -> {}", tree, normalize(tree.clone()));
 }
