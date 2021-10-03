@@ -18,6 +18,6 @@ cargo run --release
 
 ## Future Work
 
-* [] Constant definitions for standard terms and others.
-* [] Multi-character variables.
-* [] Support for [typed lambda calculus](https://en.wikipedia.org/wiki/Typed_lambda_calculus).
+* Constant definitions for standard terms and others.
+* Multi-character variables.
+* Support for [typed lambda calculus](https://en.wikipedia.org/wiki/Typed_lambda_calculus).
